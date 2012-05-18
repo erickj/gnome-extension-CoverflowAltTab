@@ -18,6 +18,7 @@ const Tweener = imports.ui.tweener;
 
 let WINDOWPREVIEW_SCALE = 0.5;
 let SHOW_INTERVAL = 300;
+let APP_ICON_SIZE = 100;
 
 function Switcher(windows, actions) {
 	this._init(windows, actions);
@@ -27,6 +28,7 @@ Switcher.prototype = {
 	_init: function(windows, actions) {
 		this._windows = windows;
 		this._windowTitle = null;
+		this._windowIcon = null;
 		this._modifierMask = null;
 		this._currentIndex = 0;
 		this._actions = actions;
@@ -228,6 +230,55 @@ Switcher.prototype = {
 				});
 			}
 		}
+
+		// application icon
+		if (this._windowIcon) {
+			let fadeOutComplete = function(bg,iconBox) {
+				return function() {
+					bg.remove_actor(iconBox);
+				}
+			}(this._background,this._windowIcon);
+			Tweener.addTween(this._windowIcon, {
+				opacity: 0,
+				time: 0.25,
+				transition: 'easeOutQuad',
+				onComplete: fadeOutComplete
+			});
+		}
+
+		let tracker = Shell.WindowTracker.get_default();
+		let app = tracker.get_window_app(this._windows[this._currentIndex]);
+		let icon = app.create_icon_texture(APP_ICON_SIZE);
+		if (!icon) {
+			icon = new St.Icon({
+				icon_name: 'applications-other',
+				icon_type: St.IconType.FULLCOLOR,
+				icon_size: APP_ICON_SIZE
+			});
+		}
+		icon.width = APP_ICON_SIZE;
+		icon.height = APP_ICON_SIZE;
+
+		this._windowIcon = new St.Bin({
+			style_class: 'coverflow-app-icon-box',
+			opacity: 0
+		});
+		this._windowIcon.add_actor(icon);
+		this._previewLayer.add_actor(this._windowIcon);
+		this._windowIcon.x = (monitor.width - APP_ICON_SIZE) / 2;
+		this._windowIcon.y = (monitor.height - APP_ICON_SIZE) / 2;
+		let fadeInComplete = function(iconBox,preview) {
+			return function() {
+				iconBox.raise(preview);
+			}
+		}(this._windowIcon,this._previews[this._currentIndex]);
+
+		Tweener.addTween(this._windowIcon, {
+			opacity: 255,
+			time: 0.25,
+			transition: 'easeOutQuad',
+			onComplete: fadeInComplete
+		});
 	},
 
 	_keyPressEvent: function(actor, event) {
@@ -306,6 +357,14 @@ Switcher.prototype = {
 				transition: 'easeOutQuad',
 			});
 		}
+
+		// applicaton icon
+		Tweener.removeTweens(this._windowIcon);
+		Tweener.addTween(this._windowIcon, {
+			opacity: 0,
+			time: 0.25,
+			transition: 'easeOutQuad'
+		});
 
 		// background
 		Tweener.removeTweens(this._background);
